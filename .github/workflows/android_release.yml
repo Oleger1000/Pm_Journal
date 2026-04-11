@@ -44,8 +44,8 @@ jobs:
         run: flutter pub get
       
       # Этот шаг остается таким же, но теперь будет работать надежнее
-      - name: Create google-services.json
-        run: printf '%s\n' "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+      - name: Create google-services.json from Base64
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > android/app/google-services.json
 
       - name: Build Release APK
         run: >
