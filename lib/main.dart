@@ -6,6 +6,7 @@ import 'services/student_service.dart';
 import 'services/attendance_service.dart';
 import 'firebase_options.dart';
 import 'screens/absences_screen.dart';
+import 'services/update_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,9 +38,26 @@ class MyApp extends StatelessWidget {
 
 ///// 🔹 СТАРТОВЫЙ ЭКРАН
 
-class JournalScreen extends StatelessWidget {
+class JournalScreen extends StatefulWidget {
   const JournalScreen({super.key});
 
+  @override
+  State<JournalScreen> createState() => _JournalScreenState();
+}
+
+class _JournalScreenState extends State<JournalScreen> {
+  // 2. Добавляем initState
+  @override
+  void initState() {
+    super.initState();
+    // Выполняем проверку после того, как первый кадр будет отрисован.
+    // Это гарантирует, что `context` будет доступен.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService().checkForUpdates(context);
+    });
+  }
+
+  // 3. Переносим build метод сюда
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -750,7 +768,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
 /*
 TODO:
-- Кешировать расписание, посещаемость списки студентов, чтобы не грузить их каждый раз 
 - Ускорить отправку отметок, сейчас они отправляются по одной, можно оптимизировать
 - Показывать какие пары пропустил отдельный студент
 - Добавить возможность видеть кто поставил отметки

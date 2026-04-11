@@ -32,6 +32,13 @@ dependencies:
     sdk: flutter
   http: ^1.2.0
   shared_preferences: ^2.2.2
+  dio: ^5.4.1                 # Продвинутый HTTP-клиент для скачивания с прогрессом
+  path_provider: ^2.1.2       # Для получения пути к папкам на устройстве
+  open_file_plus: ^3.4.1      # Для открытия APK-файла (запуска установки)
+  permission_handler: ^11.3.0 # Для запроса специальных разрешений
+  package_info_plus: ^10.0.0 # Для получения текущей версии приложения из pubspec.yaml
+  url_launcher: ^6.2.5      # Для открытия ссылки на страницу релиза в браузере
+  pub_semver: ^2.1.4 
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
