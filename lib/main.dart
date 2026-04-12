@@ -7,6 +7,7 @@ import 'services/attendance_service.dart';
 import 'firebase_options.dart';
 import 'screens/absences_screen.dart';
 import 'services/update_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,8 +37,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-///// 🔹 СТАРТОВЫЙ ЭКРАН
-
 class JournalScreen extends StatefulWidget {
   const JournalScreen({super.key});
 
@@ -50,14 +49,11 @@ class _JournalScreenState extends State<JournalScreen> {
   @override
   void initState() {
     super.initState();
-    // Выполняем проверку после того, как первый кадр будет отрисован.
-    // Это гарантирует, что `context` будет доступен.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       UpdateService().checkForUpdates(context);
     });
   }
 
-  // 3. Переносим build метод сюда
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -70,7 +66,6 @@ class _JournalScreenState extends State<JournalScreen> {
             children: [
               const Spacer(),
 
-              /// 🔹 Заголовок (как было)
               const Text(
                 'PM.Journal',
                 textAlign: TextAlign.center,
@@ -84,7 +79,6 @@ class _JournalScreenState extends State<JournalScreen> {
 
               const Spacer(),
 
-              /// 🔹 КНОПКА 1 (без изменений дизайна)
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -113,7 +107,6 @@ class _JournalScreenState extends State<JournalScreen> {
 
               const SizedBox(height: 16),
 
-              /// 🔹 КНОПКА 2 (тоже как было)
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -150,7 +143,17 @@ class _JournalScreenState extends State<JournalScreen> {
   }
 }
 
-///// 🔹 ОСНОВНОЕ ПРИЛОЖЕНИЕ (ТВОИ ЭКРАНЫ)
+class ExistingTable extends StatelessWidget {
+  const ExistingTable({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Существующая группа")),
+      body: const Center(child: Text("В разработке...")),
+    );
+  }
+}
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -191,7 +194,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildScreen() {
     if (currentIndex == 0) {
-      return const AttendanceScreen(); // 👈 новое
+      return const AttendanceScreen();
     }
 
     if (currentIndex == 1) {
@@ -203,7 +206,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     if (currentIndex == 3) {
-      return const SettingsScreen(); // 👈 новое
+      return const SettingsScreen();
     }
 
     return Center(
@@ -340,20 +343,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 }
 
-///// 🔹 СУЩЕСТВУЮЩАЯ ГРУППА
-
-class ExistingTable extends StatelessWidget {
-  const ExistingTable({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Существующая группа")),
-      body: const Center(child: Text("В разработке...")),
-    );
-  }
-}
-
+// 🔹 ЭКРАН НАСТРОЕК (ИЗМЕНЕНИЯ ЗДЕСЬ)
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -362,36 +352,45 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final service = StudentService();
-  List students = [];
+  void _showSignatureDialog() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentSignature = prefs.getString('user_signature') ?? '';
+    final controller = TextEditingController(text: currentSignature);
 
-  @override
-  void initState() {
-    super.initState();
-    load();
-  }
-
-  void load() async {
-    students = await service.getStudents();
-    setState(() {});
-  }
-
-  void _addStudent() {
-    final controller = TextEditingController();
+    if (!mounted) return;
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Добавить студента"),
-        content: TextField(controller: controller),
+        title: const Text("Ваша подпись"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: "Например, ваше ФИО или инициалы",
+            helperText: "Эта подпись будет прикрепляться к каждой отметке.",
+          ),
+          autofocus: true,
+        ),
         actions: [
           TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Отмена"),
+          ),
+          TextButton(
             onPressed: () async {
-              await service.addStudent(controller.text);
+              if (controller.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Подпись не может быть пустой")),
+                );
+                return;
+              }
+              await prefs.setString('user_signature', controller.text.trim());
               Navigator.pop(context);
-              load();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Подпись сохранена")),
+              );
             },
-            child: const Text("Добавить"),
+            child: const Text("Сохранить"),
           ),
         ],
       ),
@@ -410,6 +409,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             MaterialPageRoute(builder: (_) => const StudentsScreen()),
           );
         },
+      },
+      // 🔹 НОВЫЙ ПУНКТ МЕНЮ
+      {
+        "title": "Подпись для отметок",
+        "icon": Icons.edit,
+        "onTap": _showSignatureDialog,
       },
       {"title": "Группа", "icon": Icons.group, "onTap": () {}},
       {"title": "Экспорт (потом)", "icon": Icons.file_download, "onTap": () {}},
@@ -448,14 +453,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   final studentService = StudentService();
   final attendanceService = AttendanceService();
 
-  // Состояние
   DateTime selectedDate = DateTime.now();
   ScheduleItem? selectedLesson;
   ScheduleResponse? scheduleData;
 
   List students = [];
-  List records = []; // Все сохраненные отметки из базы
-  Map<String, AttendanceStatus> statuses = {}; // Текущие отметки на экране
+  List records = [];
+  Map<String, AttendanceStatus> statuses = {};
 
   @override
   void initState() {
@@ -463,16 +467,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     loadData();
   }
 
-  // Загружаем сразу все необходимые данные
   Future<void> loadData() async {
     students = await studentService.getStudents();
     records = await attendanceService.loadAttendance();
     scheduleData = await ScheduleService.fetch();
-    _updateStatuses(); // Подтягиваем отметки, если пара уже выбрана
-    setState(() {});
+    _updateStatuses();
+    if (mounted) setState(() {});
   }
 
-  // Правильный расчет недели для ЛЮБОЙ выбранной даты
   int getCurrentWeek(DateTime targetDate, DateTime startDate) {
     final target = DateTime(targetDate.year, targetDate.month, targetDate.day);
     final start = DateTime(startDate.year, startDate.month, startDate.day);
@@ -481,26 +483,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return week == 1 ? 2 : 1;
   }
 
-  // Получаем расписание на выбранный день
   List<ScheduleItem> getLessonsForDate() {
     if (scheduleData == null) return [];
-
     final currentWeek = getCurrentWeek(selectedDate, scheduleData!.startDate);
     final weekday = selectedDate.weekday;
-
     return scheduleData!.classes
         .where((e) => e.day == weekday && e.week == currentWeek)
         .toList()
       ..sort((a, b) => a.lesson.compareTo(b.lesson));
   }
 
-  // Обновляем статусы на экране на основе базы данных
   void _updateStatuses() {
     statuses.clear();
     if (selectedLesson == null) return;
-
     for (var student in students) {
-      // Ищем, есть ли уже сохраненная отметка для этого студента на эту дату и пару
       final existingRecord = records.where((r) {
         final d = DateTime.parse(r['date']);
         return d.year == selectedDate.year &&
@@ -509,24 +505,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             r['lesson'] == selectedLesson!.lesson &&
             r['studentId'] == student['id'];
       }).toList();
-
       if (existingRecord.isNotEmpty) {
-        // Если нашли старую запись, ставим её статус
         final statusStr = existingRecord.first['status'];
-        if (statusStr == 'present')
+        if (statusStr == 'present') {
           statuses[student['id']] = AttendanceStatus.present;
-        else if (statusStr == 'absent')
+        } else if (statusStr == 'absent') {
           statuses[student['id']] = AttendanceStatus.absent;
-        else if (statusStr == 'excused')
+        } else if (statusStr == 'excused') {
           statuses[student['id']] = AttendanceStatus.excused;
+        }
       } else {
-        // Если записи нет, по умолчанию ставим "Есть"
         statuses[student['id']] = AttendanceStatus.present;
       }
     }
   }
 
-  // Сохранение изменений
   void save() async {
     if (selectedLesson == null) {
       ScaffoldMessenger.of(
@@ -535,22 +528,78 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       return;
     }
 
-    // Сохраняем каждого студента
+    final prefs = await SharedPreferences.getInstance();
+    final signature = prefs.getString('user_signature');
+
+    if (signature == null || signature.trim().isEmpty) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text("Необходима подпись"),
+          content: const Text(
+            "Чтобы сохранить изменения, необходимо указать вашу подпись.\n\nПерейдите в Настройки -> Подпись для отметок.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text("Понятно"),
+            ),
+          ],
+        ),
+      );
+      return; // Прерываем сохранение
+    }
+
+    // Показываем индикатор загрузки для наглядности
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Сохранение..."),
+        duration: Duration(seconds: 10),
+      ),
+    );
+
+    try {
+      // Вызываем новый оптимизированный метод, передавая все данные разом
+      await attendanceService.updateAttendanceBatch(
+        statuses: statuses,
+        date: selectedDate,
+        lesson: selectedLesson!.lesson,
+        markedBy: signature,
+      );
+
+      // Обновляем локальные данные после успешного сохранения
+      records = await attendanceService.loadAttendance();
+
+      if (mounted) {
+        // Убираем старый SnackBar и показываем новый
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Отметки сохранены ✅")));
+      }
+    } catch (e) {
+      // Обработка ошибок
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Ошибка сохранения: $e")));
+      }
+    }
+
     for (var student in students) {
       final status = statuses[student['id']] ?? AttendanceStatus.present;
-
       await attendanceService.markAttendance(
         studentId: student['id'],
-        date:
-            selectedDate, // Важно: сохраняем именно выбранную дату, а не DateTime.now()
+        date: selectedDate,
         lesson: selectedLesson!.lesson,
         status: status,
+        markedBy: signature,
       );
     }
 
-    // Перезагружаем записи из базы, чтобы локальные данные обновились
     records = await attendanceService.loadAttendance();
-
     if (mounted) {
       ScaffoldMessenger.of(
         context,
@@ -566,7 +615,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     final todayLessons = getLessonsForDate();
 
-    // Защита от красного экрана: если при смене даты старой пары нет в новом списке
     if (selectedLesson != null &&
         !todayLessons.any((l) => l.lesson == selectedLesson!.lesson)) {
       selectedLesson = null;
@@ -575,12 +623,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     return Column(
       children: [
-        // 🔹 ВЫБОР ДАТЫ И ПАРЫ
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: Row(
             children: [
-              // Кнопка календаря
               TextButton.icon(
                 icon: const Icon(Icons.calendar_today),
                 label: Text(
@@ -596,15 +642,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   if (date != null) {
                     setState(() {
                       selectedDate = date;
-                      selectedLesson = null; // При смене даты сбрасываем пару
+                      selectedLesson = null;
                       _updateStatuses();
                     });
                   }
                 },
               ),
               const SizedBox(width: 16),
-
-              // Выпадающий список пар
               Expanded(
                 child: DropdownButton<ScheduleItem>(
                   isExpanded: true,
@@ -622,7 +666,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   onChanged: (lesson) {
                     setState(() {
                       selectedLesson = lesson;
-                      _updateStatuses(); // Обновляем статусы при выборе пары
+                      _updateStatuses();
                     });
                   },
                 ),
@@ -630,8 +674,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ],
           ),
         ),
-
-        // 🔹 СПИСОК СТУДЕНТОВ
         Expanded(
           child: selectedLesson == null
               ? const Center(
@@ -644,7 +686,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   itemCount: students.length,
                   itemBuilder: (_, i) {
                     final student = students[i];
-
                     return Card(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -679,16 +720,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   },
                 ),
         ),
-
-        // 🔹 КНОПКА СОХРАНЕНИЯ
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: SizedBox(
-            width: double.infinity, // Кнопка на всю ширину
+            width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: selectedLesson == null
-                  ? null
-                  : save, // Блокируем, если пара не выбрана
+              onPressed: selectedLesson == null ? null : save,
               icon: const Icon(Icons.save),
               label: const Text("Сохранить изменения"),
               style: ElevatedButton.styleFrom(
@@ -703,6 +740,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 }
+
+// ... (StudentsScreen остается без изменений)
 
 class StudentsScreen extends StatefulWidget {
   const StudentsScreen({super.key});
@@ -768,9 +807,5 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
 /*
 TODO:
-- Ускорить отправку отметок, сейчас они отправляются по одной, можно оптимизировать
-- Показывать какие пары пропустил отдельный студент
-- Добавить возможность видеть кто поставил отметки
 - Экспорт в Excel для удобства работы с данными вне приложения
-- Воркер для гитхаба чтобы билдить apk и выкладывать его в релиз при пуше в main
 */

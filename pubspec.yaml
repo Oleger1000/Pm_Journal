@@ -38,7 +38,7 @@ dependencies:
   permission_handler: ^11.3.0 # Для запроса специальных разрешений
   package_info_plus: ^10.0.0 # Для получения текущей версии приложения из pubspec.yaml
   url_launcher: ^6.2.5      # Для открытия ссылки на страницу релиза в браузере
-  pub_semver: ^2.1.4 
+  pub_semver: ^2.1.4      # Для сравнения версий (проверка наличия обновлений)
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

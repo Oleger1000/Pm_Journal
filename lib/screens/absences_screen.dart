@@ -3,6 +3,8 @@ import '../services/student_service.dart';
 import '../services/attendance_service.dart';
 import '../services/shedule_service.dart';
 import '../models/shedule_item.dart';
+import '../services/attendance_service.dart';
+import 'student_absence_detail_screen.dart';
 
 class AbsencesScreen extends StatefulWidget {
   const AbsencesScreen({super.key});
@@ -31,32 +33,28 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
 
   Future<void> loadData() async {
     students = await studentService.getStudents();
-    // Подгружаем посещаемость
     records = await attendanceService.loadAttendance();
-    // Подгружаем расписание
     final response = await ScheduleService.fetch();
     schedule = response.classes;
     scheduleStartDate = response.startDate;
 
-    schedule = response.classes;
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
-  int getCurrentWeek(DateTime startDate) {
-    final today = DateTime.now();
-    final diff =
-        DateTime(today.year, today.month, today.day)
-            .difference(
-              DateTime(startDate.year, startDate.month, startDate.day),
-            )
-            .inDays ~/
-        7;
+  int getCurrentWeek(DateTime targetDate, DateTime startDate) {
+    final target = DateTime(targetDate.year, targetDate.month, targetDate.day);
+    final start = DateTime(startDate.year, startDate.month, startDate.day);
+    final diff = target.difference(start).inDays ~/ 7;
     final week = diff % 2 == 0 ? 1 : 2;
-    return week == 1 ? 2 : 1; // фикс, как на твоем ScheduleScreen
+    return week == 1 ? 2 : 1;
   }
 
   List<ScheduleItem> getLessonsForDate(DateTime date, DateTime semesterStart) {
-    final currentWeek = getCurrentWeek(semesterStart);
+    // Раньше было: final currentWeek = getCurrentWeek(semesterStart);
+    // Теперь:
+    final currentWeek = getCurrentWeek(date, semesterStart);
     final weekday = date.weekday; // 1-Пн, 7-Вс
 
     return schedule
@@ -84,12 +82,10 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Получаем список пар для выбранной даты
     final lessons = scheduleStartDate == null
         ? <ScheduleItem>[]
         : getLessonsForDate(selectedDate, scheduleStartDate!);
 
-    // Сбрасываем выбранную пару, если её нет в новом дне
     if (selectedLesson != null &&
         !lessons.any((l) => l.lesson == selectedLesson!.lesson)) {
       selectedLesson = null;
@@ -101,7 +97,6 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
           padding: const EdgeInsets.all(8.0),
           child: Row(
             children: [
-              // 🔹 Выбор даты
               TextButton.icon(
                 icon: const Icon(Icons.calendar_today),
                 label: Text(
@@ -123,8 +118,6 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
                 },
               ),
               const SizedBox(width: 16),
-
-              // 🔹 Выбор пары
               Expanded(
                 child: DropdownButton<ScheduleItem>(
                   isExpanded: true,
@@ -147,8 +140,6 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
             ],
           ),
         ),
-
-        // 🔹 Список студентов (Только просмотр)
         Expanded(
           child: ListView.builder(
             itemCount: students.length,
@@ -161,9 +152,10 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
                   ? studentRecords.first
                   : null;
 
-              // Определяем статус
               AttendanceStatus? status;
+              String? markedBy;
               if (record != null) {
+                markedBy = record['markedBy'] as String?;
                 switch (record['status']) {
                   case 'present':
                     status = AttendanceStatus.present;
@@ -179,7 +171,6 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
                 status = AttendanceStatus.present;
               }
 
-              // Создаем красивый текст вместо выпадающего списка
               Widget statusWidget;
               switch (status) {
                 case AttendanceStatus.present:
@@ -193,23 +184,51 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
                   );
                   break;
                 case AttendanceStatus.absent:
-                  statusWidget = const Text(
-                    "❌ Пропуск",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  statusWidget = Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "❌ Пропуск",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (markedBy != null)
+                        Text(
+                          "Отметил: $markedBy",
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
                   );
                   break;
                 case AttendanceStatus.excused:
-                  statusWidget = const Text(
-                    "📄 Уважительная",
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  statusWidget = Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "📄 Уважительная",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (markedBy != null)
+                        Text(
+                          "Отметил: $markedBy",
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
                   );
                   break;
                 default:
@@ -222,8 +241,32 @@ class _AbsencesScreenState extends State<AbsencesScreen> {
                   subtitle: Text(
                     "Пропущено часов: ${calculateHours(student['id'])}",
                   ),
-                  // ИСПРАВЛЕНИЕ: Теперь здесь просто текстовый виджет, а не DropdownButton
                   trailing: statusWidget,
+                  onTap: () {
+                    // Проверяем, что данные для перехода загружены
+                    if (scheduleStartDate == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Данные расписания еще загружаются..."),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Переход на экран с деталями
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StudentAbsenceDetailScreen(
+                          student: student,
+                          allRecords: records.cast<Map<String, dynamic>>(), // Передаем ВСЕ записи
+                          allScheduleItems: schedule, // Передаем ВСЕ расписание
+                          semesterStartDate:
+                              scheduleStartDate!, // Передаем дату начала семестра
+                        ),
+                      ),
+                    );
+                  },
                 ),
               );
             },
